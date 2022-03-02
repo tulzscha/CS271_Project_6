@@ -23,14 +23,13 @@ INCLUDE Irvine32.inc
 ;			maxLength -- Length of user input (required for Irvine ReadString)
 ; Returns: screen output of string
 ;----------------------------------------------------------------------------------------------
-mGetString MACRO prompt, targetLoc, maxLength
+;mGetString MACRO prompt, targetLoc, maxLength
+mGetString MACRO targetLoc, maxLength
 	PUSH	EAX
 	PUSH	ECX						; preserve registers
 	PUSH	EDX
 
-;	MOV		EDX, prompt				; standard WriteString call for prompt
-;	CALL	WriteString
-	mDisplayString prompt
+;	mDisplayString prompt
 
 ; set up and call ReadString
 	MOV		EDX, targetLoc			; set up and call ReadString
@@ -66,6 +65,8 @@ ENDM
 ARRAYLENGTH		=	5
 MAXCHARS		=	11					; a SDWORD int can only be 11 chars long, -2,147,483,648, plus padding 0
 
+USERSTRLENGTH	=	16
+
 
 .data
 
@@ -75,7 +76,7 @@ greeting	BYTE	"Project 6: String Primitives and Macros.",13,10
 			BYTE	"**EC: Numbers the entry lines and displays a running sum.",13,10
 			BYTE	"**EC: HAHAHAHAAH MAYBE IN ANOTHER LIFE.",13,10,13,10
 			BYTE	"This program will ask you for 10 signed decimal integers.",13,10
-			BYTE	"Each integer must be small enough to fit into a 32-bit register (-2,147,483,648 to 2,147,483,647)",13,10
+			BYTE	"Each integer must fit into a 32-bit register (-2,147,483,648 to 2,147,483,647).",13,10
 			BYTE	"Once you're done entering integers, the program will display a list",13,10
 			BYTE	"of the integers, the sum of the integers, and the average of the values.",13,10
 			BYTE	"Salmon on the bank / curing in the sun for days / eat them up yum yum ~A bear",13,10,13,10,0
@@ -98,13 +99,18 @@ negSign		BYTE	"-",0
 
 ; variables
 numArray	SDWORD	ARRAYLENGTH DUP(?)			; 10
-userString	BYTE	MAXCHARS DUP(?)				; 16
 
 
-valToWrite	SDWORD	?							; value to write
-tempArray	BYTE	(MAXCHARS + 1) DUP(0)		; array used as scratch by writeVal -- 11 max characters, plus padding 0
+; variables for readVal
+specialNum	BYTE	"-2147483648",0				; This damn number.
+padding		BYTE	10 DUP(0)					; write some 0s
+validVal	SDWORD	0
+userVal		SDWORD	0							; user's converted value will be here
+userString	BYTE	USERSTRLENGTH DUP(?)		; 16
 
-strToWrite	BYTE	?							; 
+; variables for writeVal
+tempArray	BYTE	(MAXCHARS + 2) DUP(0)		; array used as scratch by writeVal -- 12 characters, plus padding 0
+
 
 ; EC variables
 runTotal	SDWORD	?
@@ -123,14 +129,14 @@ main PROC
 ; display greeting prompt
 	mDisplayString	OFFSET greeting
 
-COMMENT &					; testing mgetstring
+ COMMENT &					; testing mgetstring
 	CALL	crlf
-	mGetString	OFFSET numEntry, OFFSET userString, MAXCHARS
+	mGetString	OFFSET userString, USERSTRLENGTH
 	caLL crlf
 	mdisplayString	OFFSET userString
 	call crlf
-	mov	EAX, uStrLen
-	call WriteInt
+;	mov	EAX, uStrLen
+;	call WriteInt
 	call crlf
 
 
@@ -152,14 +158,37 @@ _fillArray:
 ; number the output line and display prompt
 	MOV		EAX, ECX
 
-	PUSH	OFFSET tempArray
-	PUSH	EAX
-	CALL	writeVal
+	PUSH	OFFSET tempArray				; scratch array for working in
+	PUSH	EAX								; push value to print out
+	CALL	writeVal						; actual CALL
 
 
 ; call read procedure, store result in array
 	mDisplayString	OFFSET numEntry			; output number entry prompt
-	CALL	Readint							; READVAL GOES HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+;	CALL	Readint							; READVAL GOES HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+	PUSH	OFFSET specialNum				; EBP+20
+	PUSH	OFFSET validVal					; EBP+16
+	PUSH	OFFSET userVal					; EBP+12
+	PUSH	OFFSET enteredVals				; ebp+8
+	CALL	readVal
+
+; check result boolean for valid value
+
+;	print test for validval
+;	MOV		EAX, validVal
+;	CALL	writeint
+
+	CMP		validVal, 1
+	JE		_validValue
+
+; invalid value found, ask again:
+	mDisplayString OFFSET invalidNum
+	JMP		_fillArray
+
+_validValue:
+	MOV		EAX, userVal
+	
 	MOV		[EDI], EAX
 
 	ADD		runTotal, EAX
@@ -175,9 +204,9 @@ _fillArray:
 	mDisplayString	OFFSET subTotMsg
 	MOV		EAX, runTotal
 
-	PUSH	OFFSET tempArray
-	PUSH	EAX
-	CALL	writeVal
+	PUSH	OFFSET tempArray				; scratch array for working in
+	PUSH	EAX								; push value to print out
+	CALL	writeVal						; actual CALL
 
 	mDisplayString	OFFSET linebreak
 	mDisplayString	OFFSET linebreak
@@ -185,6 +214,8 @@ _fillArray:
 	JMP		_fillArray
 
 _doneFill:
+
+
 
 
 ; display array + calc sum of elements
@@ -196,13 +227,15 @@ _doneFill:
 	MOV		ESI, OFFSET numArray			;offset of first element
 	MOV		ECX, ARRAYLENGTH				; count of loops to run
 
+
+
 _displayLoop:
 	LODSD									; Val to EAX, Increment ESI by 4
 	ADD		sumValues, EAX					
 	
-	PUSH	OFFSET tempArray
-	PUSH	EAX
-	CALL	writeVal
+	PUSH	OFFSET tempArray				; scratch array for working in
+	PUSH	EAX								; push value to print out
+	CALL	writeVal						; actual CALL
 
 
 ; test if last loop, 
@@ -214,7 +247,7 @@ _displayLoop:
 	LOOP	_displayLoop
 
 _endDisplay:
-	mDisplayString	OFFSET cBracket			; closing bracket and linebreak
+	mDisplayString	OFFSET cBracket			; print closing bracket
 
 ; here we display results
 ; procedure to calculate sum/average
@@ -233,9 +266,9 @@ _endDisplay:
 	MOV		EBX,	ARRAYLENGTH
 	IDIV	EBX
 
-	PUSH	OFFSET tempArray
-	PUSH	EAX
-	CALL	writeVal
+	PUSH	OFFSET tempArray				; scratch array for working in
+	PUSH	EAX								; push value to print out
+	CALL	writeVal						; actual CALL
 	
 	mDisplayString	OFFSET byePrompt
 
@@ -251,18 +284,95 @@ main ENDP
 ;
 ; Preconditions: 
 ; Postconditions: 
-; Receives:			
+; Receives:			[EBP + 20] -- our special boah -2147483648 in string form
+;					[EBP + 16] -- validVal boolean
+;					[EBP + 12] -- userVal variable; will be filled with SDWORD conversion
+;								  (iff successful!)
+;					[EBP + 8] -- userString; OFFSET of array to store the user's string 
 ; Returns:			
 ;----------------------------------------------------------------------------------------------
 readVal PROC
 ; prep stack, save registers
-	PUSH	EBP
-	MOV		EBP, ESP
+	LOCAL	isValid:DWORD, localValue:SDWORD, foundNeg:DWORD, stringLength:DWORD, specialBoah:BYTE
+	PUSHAD
 
-	; meat goes here
+	MOV		isValid, 1
+	MOV		localValue, 0
+	MOV		foundNeg, 0
 
-	POP		EBP
-	RET		0
+;	PUSH	validVal		[16]
+;	PUSH	userVal			[12]
+;	PUSH	userString		[+8]
+;	CALL	readVal
+
+
+;	CALL	readInt
+	mGetString	[EBP + 8], USERSTRLENGTH
+	CALL crlf
+	mdisplayString	[EBP + 8]
+	call crlf
+
+
+; get and test the first character for certain criteria.
+	CLD									; we want to go forwards
+	MOV		ESI, [EBP + 8]				; first char in array
+
+	LODSB								; get first character
+
+; test it for + or - or NULL
+	CMP		AL, 43						; is it an ASCII + symbol?
+	JE		_parseString
+	CMP		AL, 45						; is it a minus sign?
+	JE		_setMinusFlag
+	CMP		AL, 0						; is the first byte NULL? invalid string!
+	JE		_exitProcedure				; isValid is still 0
+
+; first char not a + or -? reset and begin parsing
+	MOV		ESI, [EBP + 8]				; first char in array
+	JMP		_parseString				; not + or -
+
+_setMinusFlag:
+	MOV		foundNeg, 1
+
+_parseString:
+	MOV		EAX, 0						; clear register
+
+	LODSB								; get byte into al
+
+	CMP		EAX, 0						; if "empty" then string done
+	JE		_doneparse
+
+
+
+
+
+	MOV		isValid, 1
+
+
+; see if our value is negative
+	CMP		foundNeg, 1
+	JNE		_storeNum					; not neg, can just store
+
+	NEG		localValue					; negative, we negate value
+
+
+; this is how we SAVE THE VALUE
+_storeNum:
+	MOV		EAX, localValue
+	MOV		EBX, [EBP + 12]
+	MOV		[EBX], EAX 
+
+_exitProdecure:
+; store final result of isValid
+	MOV		EAX, isValid
+	MOV		EBX, [EBP + 16]
+	MOV		[EBX], EAX
+
+
+
+; byebye
+	POPAD
+	RET		12
 
 readVal ENDP
 
@@ -278,7 +388,7 @@ readVal ENDP
 ; Postconditions:	
 ; Receives:			[EBP + 8] -- SDWORD value to be printed	
 ;					[EBP + 12] -- address of temp array for scratch work
-; Returns:			Outputs value as a string, using 
+; Returns:			Outputs value as a string, using mDisplayString macro
 ;----------------------------------------------------------------------------------------------
 writeVal PROC
 ; prep stack, save registers
@@ -379,9 +489,6 @@ _printArray:
 	RET		8
 
 writeVal ENDP
-
-
-
 
 
 END main
