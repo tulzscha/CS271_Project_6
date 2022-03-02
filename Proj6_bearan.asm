@@ -62,10 +62,9 @@ ENDM
 
 ; (insert constant definitions here)
 
-ARRAYLENGTH		=	5
+ARRAYLENGTH		=	10
 MAXCHARS		=	11					; a SDWORD int can only be 11 chars long, -2,147,483,648, plus padding 0
-
-USERSTRLENGTH	=	16
+USERSTRLENGTH	=	16					; the user gets this much space to enter characters. More than they need.
 
 
 .data
@@ -81,14 +80,14 @@ greeting	BYTE	"Project 6: String Primitives and Macros.",13,10
 			BYTE	"of the integers, the sum of the integers, and the average of the values.",13,10
 			BYTE	"Salmon on the bank / curing in the sun for days / eat them up yum yum ~A bear",13,10,13,10,0
 numEntry	BYTE	": Please enter a signed integer: ",0
-invalidNum	BYTE	"Something's wrong with your entry. Please try again.",13,10,0
+invalidNum	BYTE	32,32,32,"Something's wrong with your entry. Please try again.",13,10,13,10,0
 numsEntered	BYTE	13,10,"Here are your numbers, all in a nice row:",13,10,0
 numSum		BYTE	13,10,"The sum of your numbers is: ",0
 numAverage	BYTE	13,10,"The truncated average of your numbers is: ",0
 byePrompt	BYTE	13,10,13,10,"Goodbye, and thanks for all the fish! ROAR!",13,10,0
 
 enteredVals	BYTE	"You've entered this many values: ",0
-subTotMsg	BYTE	"Your subtotal so far is: ",0
+subTotMsg	BYTE	32,32,32,"Your subtotal so far is: ",0
 
 oBracket	BYTE	"[",0
 cBracket	BYTE	"]",0
@@ -303,9 +302,7 @@ readVal PROC
 ; get the string from the user woth mGetString
 	mGetString	[EBP + 8], USERSTRLENGTH
 	
-	CALL crlf
-	mdisplayString	[EBP + 8]
-	call crlf
+
 
 ; ===============================================================
 ; Here is the special case for -2147483648 string
@@ -332,23 +329,23 @@ _checkSign:
 	MOV		ESI, [EBP + 8]				; user string
 	MOV		EAX, 0
 	LODSB
+
+; test the first character for validity, and is it a + or - sign?
 	CMP		EAX, 43						; is it an ASCII + symbol?
 	JE		_setPlus
 	CMP		EAX, 45						; is it an ASCII - symbol?
 	JE		_setMinus
-
 	CMP		EAX, 48						; does the caracter come before ASCII 0?
 	JB		_exitProcedure				; if so, terminaate with valid = 0
-
 	CMP		EAX, 57						; does the caracter come after ASCII 9?
 	JA		_exitProcedure				; if so, terminaate with valid = 0
 
-	JMP		_countString				; it's a numeral, so leave it as 0
+	JMP		_countString
 
+; code to set the sign flag
 _setPlus:
 	MOV		posOrNeg, 1					; set flag 1 and start parsing
 	JMP		_countString
-
 _setMinus:	
 	MOV		posOrNeg, -1				; set flag -1 and start parsing
 
@@ -358,8 +355,6 @@ _countString:
 ; Here we count the length of the string
 ; ===============================================================
 
-	MOV		EAX, PosOrNeg
-	Call		Writeint
 
 
 ; find string length:
@@ -381,57 +376,85 @@ _doneCount:
 	JE		_exitProcedure
 	MOV		stringLength, ECX
 
-	MOV		EAX, stringLength
-	CALL	WriteInt
+
+; ===============================================================
+; Here is the loop to scan characters and add the values
+; ===============================================================
+
+	MOV		ECX, 0
+	MOV		ESI, [EBP + 8]
+	ADD		ESI, stringLength					; Set ESI with  string length
+	DEC		ESI									; minus 1!
+	STD											; descending order
+
+; if the lead char is + or -, decrement stringlenth -- one less loop
+
+	CMP		posOrNeg, 0							; flag = 0? forst char is numeric
+	JE		_mathLoop					
+
+	DEC		stringLength						; flag is 1/-1 first char is +/-
 
 
-COMMENT &
-; get and test the first character for certain criteria.
-	CLD									; we want to go forwards
-	MOV		ESI, [EBP + 8]				; first char in array
+; meat of the loop
+_mathLoop:
+	
+	CMP		ECX, 0								; first loop -- set multiplier to 1
+	JE		_onesPlace
+	
+	JMP		_notOnesPlace						; not first? then we need to multiply by powers of 10
 
-	LODSB								; get first character
+_onesPlace:
+	MOV		EBX, 1
+	JMP		_multiplierSet
 
-; test it for + or - or NULL
-	CMP		AL, 43						; is it an ASCII + symbol?
-	JE		_parseString
-	CMP		AL, 45						; is it a minus sign?
-	JE		_setMinusFlag
-	CMP		AL, 0						; is the first byte NULL? invalid string!
-	JE		_exitProcedure				; isValid is still 0
+_notOnesPlace:
+	MOV		EAX, 1
+	PUSH	ECX
 
-; first char not a + or -? reset and begin parsing
-	MOV		ESI, [EBP + 8]				; first char in array
-	JMP		_parseString				; not + or -
+	_mulLoop:
+		MOV		EBX, 10
+		MUL		EBX						; mul EAX by 10 == gets called ECX times - 10. 100. 1000. 10000. etc
+		LOOP	_mulLoop
 
-_setMinusFlag:
-	MOV		foundNeg, 1
+	MOV		EBX, EAX
 
+	POP		ECX
 
-; now we begin the parsing in earnest...
-	MOV		ECX, 0						; set counter
-_parseString:
-	MOV		EAX, 0						; clear register
+_multiplierSet:							; 10s multiplier is in EBX
+	
+	MOV		EAX, 0						; clear EAX
 
-	LODSB								; get byte into eax
-
-	CMP		EAX, 0						; if "empty" then string done
-	JE		_doneParse
-
+; get the character
+	LODSB
+	
 	CMP		EAX, 48						; does the caracter come before ASCII 0?
 	JB		_exitProcedure				; if so, terminaate with valid = 0
 
 	CMP		EAX, 57						; does the caracter come after ASCII 9?
-	JB		_exitProcedure				; if so, terminaate with valid = 0
+	JA		_exitProcedure				; if so, terminaate with valid = 0
+
+	SUB		EAX, 48						; convert from ASCII to decimal!
+
+	MUL		EBX							; power of 10 is in EBX
 
 
-	ADD		localValue, EAX				; add to localval
-	JO		_exitProcedure				; if we generated an overflow, end with valid = 0
+; rack up the value
+	ADD		localValue, EAX
+	
+; test for overflow
+	JC		_exitProcedure				; overflow  = invalid
+	JO		_exitProcedure
+	
+	INC		ECX							; add 1 to ECX
+	CMP		ECX, stringLength			; have looped fully
 
-	ADD		ECX, 10
+	JE		_doneMath
 
-&
-_doneParse:
+	JMP		_mathLoop					; back to top
+
+
+_doneMath:
+
 	MOV		isValid, 1
 
 
