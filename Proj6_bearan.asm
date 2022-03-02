@@ -102,11 +102,11 @@ numArray	SDWORD	ARRAYLENGTH DUP(?)			; 10
 
 
 ; variables for readVal
-specialNum	BYTE	"-2147483648",0				; This damn number.
-padding		BYTE	10 DUP(0)					; write some 0s
+specialNum	BYTE	"-2147483648",0,0,0,0,0,0   ; This damn number. Plus padding zeroes
 validVal	SDWORD	0
 userVal		SDWORD	0							; user's converted value will be here
 userString	BYTE	USERSTRLENGTH DUP(?)		; 16
+padding		BYTE	5 DUP(0)					; don't want overrun by some fluke
 
 ; variables for writeVal
 tempArray	BYTE	(MAXCHARS + 2) DUP(0)		; array used as scratch by writeVal -- 12 characters, plus padding 0
@@ -293,26 +293,99 @@ main ENDP
 ;----------------------------------------------------------------------------------------------
 readVal PROC
 ; prep stack, save registers
-	LOCAL	isValid:DWORD, localValue:SDWORD, foundNeg:DWORD, stringLength:DWORD, specialBoah:BYTE
+	LOCAL	isValid:DWORD, localValue:SDWORD, posOrNeg:DWORD, stringLength:DWORD, specialBoah:BYTE
 	PUSHAD
 
-	MOV		isValid, 1
+	MOV		isValid, 0
 	MOV		localValue, 0
-	MOV		foundNeg, 0
+	MOV		posOrNeg, 0								; -1 if first char is -, 1 if first char is +, 0 if first char is 0-9
 
-;	PUSH	validVal		[16]
-;	PUSH	userVal			[12]
-;	PUSH	userString		[+8]
-;	CALL	readVal
-
-
-;	CALL	readInt
+; get the string from the user woth mGetString
 	mGetString	[EBP + 8], USERSTRLENGTH
+	
 	CALL crlf
 	mdisplayString	[EBP + 8]
 	call crlf
 
+; ===============================================================
+; Here is the special case for -2147483648 string
+; ===============================================================
+	CLD		
+	MOV		EDI, [EBP + 8]				; user string
+	MOV		ESI, [EBP + 20]				; bastard -2147483648 string
 
+	MOV		ECX, 12
+_scanForSpecial:
+	CMPSB
+	JNE		_checkSign
+	LOOP	_scanForSpecial
+
+; rut roh, we found the thing!
+	MOV		localValue, -2147483648
+	MOV		isValid, 1
+	JMP		_storeNum
+
+_checkSign:
+; ===============================================================
+; Here we test and set our personal sign flag
+; ===============================================================
+	MOV		ESI, [EBP + 8]				; user string
+	MOV		EAX, 0
+	LODSB
+	CMP		EAX, 43						; is it an ASCII + symbol?
+	JE		_setPlus
+	CMP		EAX, 45						; is it an ASCII - symbol?
+	JE		_setMinus
+
+	CMP		EAX, 48						; does the caracter come before ASCII 0?
+	JB		_exitProcedure				; if so, terminaate with valid = 0
+
+	CMP		EAX, 57						; does the caracter come after ASCII 9?
+	JA		_exitProcedure				; if so, terminaate with valid = 0
+
+	JMP		_countString				; it's a numeral, so leave it as 0
+
+_setPlus:
+	MOV		posOrNeg, 1					; set flag 1 and start parsing
+	JMP		_countString
+
+_setMinus:	
+	MOV		posOrNeg, -1				; set flag -1 and start parsing
+
+
+_countString:
+; ===============================================================
+; Here we count the length of the string
+; ===============================================================
+
+	MOV		EAX, PosOrNeg
+	Call		Writeint
+
+
+; find string length:
+	MOV		ECX, 0						; start at 0
+	MOV		ESI, [EBP + 8]				; user string
+_startCOunt:
+	MOV		EAX, 0						; null EAX
+	LODSB								
+	CMP		EAX, 0						; if we find a null byte, terminate counting
+	JE		_doneCount
+
+; +1 to count and re-loop
+	INC		ECX							
+	JMP		_startCOunt
+
+_doneCount:
+; done counting so store the value in stringLength
+	CMP		ECX, 0						; HERE IS THE SPECIAL CASE EXIT FOR NULL STRING
+	JE		_exitProcedure
+	MOV		stringLength, ECX
+
+	MOV		EAX, stringLength
+	CALL	WriteInt
+
+
+COMMENT &
 ; get and test the first character for certain criteria.
 	CLD									; we want to go forwards
 	MOV		ESI, [EBP + 8]				; first char in array
@@ -334,23 +407,36 @@ readVal PROC
 _setMinusFlag:
 	MOV		foundNeg, 1
 
+
+; now we begin the parsing in earnest...
+	MOV		ECX, 0						; set counter
 _parseString:
 	MOV		EAX, 0						; clear register
 
-	LODSB								; get byte into al
+	LODSB								; get byte into eax
 
 	CMP		EAX, 0						; if "empty" then string done
-	JE		_doneparse
+	JE		_doneParse
+
+	CMP		EAX, 48						; does the caracter come before ASCII 0?
+	JB		_exitProcedure				; if so, terminaate with valid = 0
+
+	CMP		EAX, 57						; does the caracter come after ASCII 9?
+	JB		_exitProcedure				; if so, terminaate with valid = 0
 
 
+	ADD		localValue, EAX				; add to localval
+	JO		_exitProcedure				; if we generated an overflow, end with valid = 0
 
+	ADD		ECX, 10
 
-
+&
+_doneParse:
 	MOV		isValid, 1
 
 
 ; see if our value is negative
-	CMP		foundNeg, 1
+	CMP		posOrNeg, -1
 	JNE		_storeNum					; not neg, can just store
 
 	NEG		localValue					; negative, we negate value
@@ -362,7 +448,7 @@ _storeNum:
 	MOV		EBX, [EBP + 12]
 	MOV		[EBX], EAX 
 
-_exitProdecure:
+_exitProcedure:
 ; store final result of isValid
 	MOV		EAX, isValid
 	MOV		EBX, [EBP + 16]
