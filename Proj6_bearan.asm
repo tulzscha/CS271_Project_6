@@ -12,7 +12,6 @@ TITLE Project 6: String Primitives and Macros     (Proj6_bearan.asm)
 INCLUDE Irvine32.inc
 
 ; (insert macro definitions here)
-
 ;---------------------------------------------------------------------------------------------
 ; Name: mGetString
 ;
@@ -35,7 +34,6 @@ mGetString MACRO prompt, targetLoc, maxLength
 	MOV		EDX, targetLoc			; set up and call ReadString
 	MOV		ECX, maxLength
 	CALL	ReadString
-
 
 	POP		EDX						; restore registers
 	POP		ECX
@@ -60,9 +58,8 @@ mDisplayString MACRO stringOffset		; param - offset of string to print
 ENDM
 
 ; (insert constant definitions here)
-
-ARRAYLENGTH		=	10					; numer of ints to get
-MAXCHARS		=	11					; a SDWORD int can only be 11 chars long, -2,147,483,648, plus padding 0
+ARRAYLENGTH		=	10					; numer of ints to get - math is correct if tweaked!
+MAXCHARS		=	11					; a SDWORD int can only be 11 chars long, -2,147,483,648
 USERSTRLENGTH	=	16					; the user gets this much space to enter characters. More than they need.
 
 
@@ -135,45 +132,45 @@ _fillArray:
 
 ; make readVal call to get user input -- stored in userVal if successful
 	PUSH	OFFSET numEntry					; EBP+24 -- prompt to print for entry
-	PUSH	OFFSET specialNum				; EBP+20 -- the special case number I hate.
+	PUSH	OFFSET specialNum				; EBP+20 -- the special case number I hate, string form
 	PUSH	OFFSET validVal					; EBP+16 -- BOOLEAN FOR SUCCESS/FAILURE
-	PUSH	OFFSET userVal					; EBP+12
-	PUSH	OFFSET userString				; ebp+8
+	PUSH	OFFSET userVal					; EBP+12 -- holds the SDWORD value of the user's string
+	PUSH	OFFSET userString				; EBP+8	 -- Scratch, holds string user enters
 	CALL	readVal
 
 ; check result boolean for valid value
 	CMP		validVal, 1
-	JE		_validValue
+	JE		_validValue						; got it!
 
 _invalidValue:
-; invalid value found, ask again:
+; we didn;t find the 1, sooooo ... invalid value found, ask again:
 	mDisplayString OFFSET invalidNum
 
 	; make readVal call to get user input -- stored in userVal if successful
 	PUSH	OFFSET tryAgain					; EBP+24 -- prompt to print for entry
-	PUSH	OFFSET specialNum				; EBP+20 -- the special case number I hate.
+	PUSH	OFFSET specialNum				; EBP+20 -- the special case number I hate, string form
 	PUSH	OFFSET validVal					; EBP+16 -- BOOLEAN FOR SUCCESS/FAILURE
-	PUSH	OFFSET userVal					; EBP+12
-	PUSH	OFFSET userString				; ebp+8
+	PUSH	OFFSET userVal					; EBP+12 -- holds the SDWORD value of the user's string
+	PUSH	OFFSET userString				; EBP+8	 -- Scratch, holds string user enters
 	CALL	readVal
 
-	CMP		validVal, 0
+; we want to repeat the INVALID prompt, not the normal prompt
+	CMP		validVal, 0						
 	JE		_invalidValue
 
-
+; we just got a valid value, so we jump here:
 _validValue:
-	MOV		EAX, userVal
+	MOV		EAX, userVal					; get the result
 	
-	MOV		[EDI], EAX
+	MOV		[EDI], EAX						; store it in array
 
-	ADD		runTotal, EAX
+	ADD		runTotal, EAX					; add it to the running total
 	
 	INC		ECX								; next loop value
-	ADD		EDI, TYPE numArray
+	ADD		EDI, TYPE numArray				; move EDI to next array location
 
-	CMP		ECX, ARRAYLENGTH
+	CMP		ECX, ARRAYLENGTH				; have we gotten enough numbers?
 	JG		_doneFill
-
 
 ; Display running subtotal
 	mDisplayString	OFFSET subTotMsg
@@ -188,11 +185,10 @@ _validValue:
 
 	JMP		_fillArray
 
+; =========================================================================================
+; Done filling the array, so here we display the resulting array, and the total and average
+; =========================================================================================
 _doneFill:
-
-; ===============================================================
-; Here we display the resulting array, and the total and average
-; ===============================================================
 	mDisplayString	OFFSET numsEntered		; array display prompt
 	
 	mDisplayString	OFFSET oBracket			; opening bracket
@@ -241,7 +237,8 @@ _endDisplay:
 	PUSH	OFFSET tempArray				; scratch array for working in
 	PUSH	EAX								; we don't care about fractions, just print quotient
 	CALL	writeVal						; actual CALL
-	
+
+; so long, and thanks for all the bits
 	mDisplayString	OFFSET byePrompt
 
 	Invoke	ExitProcess,0	; exit to operating system
@@ -252,22 +249,27 @@ main ENDP
 ;---------------------------------------------------------------------------------------------
 ; Name: readVal
 ;
-; Prompts user for value. Reads value as string, using mGetString macro.
+; Prompts user for value. Reads value as string, using mGetString macro. Checks the string for
+; invalid characters. Parses string by iteratively adding the digits*powers of ten  
+; as appropriaate. WHen conclusion is reached, sets the validVal boolean as appropriate,
+; and if a number was sucessfully entered, the number will be stored in the userVal variable.
 ;
-; Preconditions: 
+; Preconditions:	Prompt to print exists. "special dude" character string exists.
 ; Postconditions: 
-; Receives:			[EBP + 24] -- prompt to display
+; Receives:			[EBP + 24] -- Offset of prompt to display
 ;					[EBP + 20] -- our special boah -2147483648 in string form
 ;					[EBP + 16] -- validVal boolean
 ;					[EBP + 12] -- userVal variable; will be filled with SDWORD conversion
 ;								  (iff successful!)
 ;					[EBP + 8] -- userString; OFFSET of array to store the user's string 
-; Returns:			
+; Returns:			userString holds the string the user entered. Not used, but it's there.
+;					Value of user's string entry converted to SDWORD and stored in userVal.
+;					validVal holds 0 (invalid) or 1 (valid) depending the user's entry
 ;----------------------------------------------------------------------------------------------
 readVal PROC
-; prep stack, save registers
-	LOCAL	isValid:DWORD, localValue:DWORD, posOrNeg:DWORD, stringLength:DWORD, specialBoah:BYTE
-	PUSHAD
+; declare LOCAL variables, for my sanity instead of needing offsets for EVERYTHING.
+	LOCAL	isValid:DWORD, localValue:DWORD, posOrNeg:DWORD, stringLength:DWORD
+	PUSHAD											; we use so many... I hope the blunt instrument is allowed
 
 ; mov 0 to isValid, and store it. Makes sure we have a failure by default
 	MOV		isValid, 0
@@ -275,13 +277,12 @@ readVal PROC
 	MOV		EBX, [EBP + 16]
 	MOV		[EBX], EAX
 
-	MOV		localValue, 0
-	MOV		posOrNeg, 0								; -1 if first char is -, 1 if first char is +, 0 if first char is 0-9
+	MOV		localValue, 0				; sum starts at 0
+	MOV		posOrNeg, 0					; -1 if first char is -, 1 if first char is +, 0 if first char is 0-9
 
 ; get the string from the user woth mGetString
 	mGetString	[EBP+24], [EBP + 8], USERSTRLENGTH
 	
-
 ; ===============================================================
 ; Here is the special case for -2147483648 string
 ; ===============================================================
@@ -296,14 +297,14 @@ _scanForSpecial:
 	LOOP	_scanForSpecial
 
 ; rut roh, we found the thing!
-	MOV		localValue, -2147483648
+	MOV		localValue, -2147483648		; store, and skip to "valid" code
 	MOV		isValid, 1
 	JMP		_storeNum
 
-_checkSign:
 ; ===============================================================
 ; Here we test and set our personal sign flag
 ; ===============================================================
+_checkSign:
 	MOV		ESI, [EBP + 8]				; user string
 	MOV		EAX, 0
 	LODSB
@@ -327,17 +328,15 @@ _setPlus:
 _setMinus:	
 	MOV		posOrNeg, -1				; set flag -1 and start parsing
 
-
-_countString:
 ; ===============================================================
 ; Here we count the length of the string
 ; ===============================================================
-
-
-
-; find string length:
+_countString:
+;prep loop
 	MOV		ECX, 0						; start at 0
 	MOV		ESI, [EBP + 8]				; user string
+
+; start loop
 _startCOunt:
 	MOV		EAX, 0						; null EAX
 	LODSB								
@@ -354,59 +353,58 @@ _doneCount:
 	JE		_exitProcedure
 	MOV		stringLength, ECX
 
+; a user-supplied string of over 11 digits is invalid by default!
+	CMP		stringLength, 11
+	JA		_exitProcedure
 
 ; ===============================================================
 ; Here is the loop to scan characters and add the values
 ; ===============================================================
-
-	MOV		ECX, 0
+	MOV		ECX, 0								; reset ECX
 	MOV		ESI, [EBP + 8]
-	ADD		ESI, stringLength					; Set ESI with  string length
+	ADD		ESI, stringLength					; Set ESI, add string length
 	DEC		ESI									; minus 1!
 	STD											; descending order
 
 ; if the lead char is + or -, decrement stringlenth -- one less loop
-
 	CMP		posOrNeg, 0							; flag = 0? forst char is numeric
 	JE		_mathLoop					
-
 	DEC		stringLength						; flag is 1/-1 first char is +/-
-
 
 ; meat of the loop
 _mathLoop:
-	
 	CMP		ECX, 0								; first loop -- set multiplier to 1
 	JE		_onesPlace
 	
 	JMP		_notOnesPlace						; not first? then we need to multiply by powers of 10
 
+; this happens on the first loop -- we set the multiplier to 1 for the ones place
 _onesPlace:
-	MOV		EBX, 1
+	MOV		EBX, 1								; EBX is multiplier, 1 in this case
 	JMP		_multiplierSet
 
+; successive loops, we multiply by 10^ECX
 _notOnesPlace:
 	MOV		EAX, 1
-	PUSH	ECX
+	PUSH	ECX							; save ECX for inner loop
 
+	; this loop raises 10^ECXth power
 	_mulLoop:
 		MOV		EBX, 10
 		MUL		EBX						; mul EAX by 10 == gets called ECX times - 10. 100. 1000. 10000. etc
 		LOOP	_mulLoop
 
-	MOV		EBX, EAX
+	MOV		EBX, EAX					; multiplier to EBX
 
-	POP		ECX
+	POP		ECX							; restore ECX
 
-_multiplierSet:							; 10s multiplier is in EBX
-	
+; the multiplier is set, and in EBX, time to start doing WORK
+_multiplierSet:							
 	MOV		EAX, 0						; clear EAX
-
-; get the character
-	LODSB
+	LODSB								; get the character
 	
 	CMP		EAX, 48						; does the caracter come before ASCII 0?
-	JB		_exitProcedure				; if so, terminaate with valid = 0
+	JB		_exitProcedure				; if so, terminate with valid = 0
 
 	CMP		EAX, 57						; does the caracter come after ASCII 9?
 	JA		_exitProcedure				; if so, terminaate with valid = 0
@@ -414,31 +412,29 @@ _multiplierSet:							; 10s multiplier is in EBX
 	SUB		EAX, 48						; convert from ASCII to decimal!
 
 	MUL		EBX							; power of 10 is in EBX
-	JO		_exitProcedure				; overflow
-
+	JO		_exitProcedure				; overflow, early exit potential
 
 ; rack up the value
 	ADD		localValue, EAX
+	JC		_exitProcedure				; carry? maybe this happens
 
-; test for carry
-	JC		_exitProcedure
-	
+; next value, and check for ending	
 	INC		ECX							; add 1 to ECX
 	CMP		ECX, stringLength			; have looped fully
-
-	JE		_doneMath
+	JE		_doneMath					; bye, math loop!
 
 	JMP		_mathLoop					; back to top
 
-
+; localvalue should have the sum of all the digits. Up until this point it was UNSIGNED, 
+; which means it could potentially hold numbers that are too large
 _doneMath:
+	CMP		localValue, 2147483647		; compare with the max value we should allow  
+	JA		_exitProcedure				; larger? bye bye!
 
-	CMP		localValue, 2147483647
-	JA		_exitProcedure
-
-; see if our value is negative
+; if we have made it this far, we have won. Valid number!
 	MOV		isValid, 1
 
+; test our sign flag
 	CMP		posOrNeg, -1
 	JNE		_storeNum					; not neg, can just store
 
@@ -448,17 +444,16 @@ _doneMath:
 
 ; this is how we SAVE THE VALUE
 _storeNum:
-	MOV		EAX, localValue
-	MOV		EBX, [EBP + 12]
-	MOV		[EBX], EAX 
+	MOV		EAX, localValue				
+	MOV		EBX, [EBP + 12]				; offset of user val, on stack
+	MOV		[EBX], EAX					; save value
 
+; This is where we land from all the "invalid" cases above ... or if we made it here the hard way
 _exitProcedure:
 ; store final result of isValid
-	MOV		EAX, isValid
+	MOV		EAX, isValid				; save the boolean 0/1
 	MOV		EBX, [EBP + 16]
 	MOV		[EBX], EAX
-
-
 
 ; byebye
 	POPAD
