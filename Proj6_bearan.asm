@@ -115,9 +115,13 @@ main PROC
 ; display greeting prompt
 	mDisplayString	OFFSET greeting
 
-; ===============================================================
-; Here is the loop to fill the array
-; ===============================================================
+; -------------------------------------------------------------------------------------
+; Here is the loop to fill the array.
+; Loops ARRAYLENGTH times. 
+; Each loop does this: Gets a value with readVal, makes sure it's valid. Re-prompts
+; until valid number is received from the user. Then calculates and displays the
+; running subtitle.
+; -------------------------------------------------------------------------------------
 	MOV		EDI, OFFSET numArray			; dest is start of array
 	MOV		ECX, 1
 
@@ -185,9 +189,13 @@ _validValue:
 
 	JMP		_fillArray
 
-; =========================================================================================
-; Done filling the array, so here we display the resulting array, and the total and average
-; =========================================================================================
+; ------------------------------------------------------------------------------------------
+; Done filling the array, so here we display the resulting array, and the total and average.
+; Displays a prompt, and then an opening bracket. Cycles through array printing values
+; separated by commas, until array is exhausted, then closes the brackets.  Displays the sum
+; of the numbers, and then calculates and displays the truncated integer average. Then...
+; the proram ends! Hopefully with less smoke and fire than some code I've written.
+; ------------------------------------------------------------------------------------------
 _doneFill:
 	mDisplayString	OFFSET numsEntered		; array display prompt
 	
@@ -283,9 +291,12 @@ readVal PROC
 ; get the string from the user woth mGetString
 	mGetString	[EBP+24], [EBP + 8], USERSTRLENGTH
 	
-; ===============================================================
-; Here is the special case for -2147483648 string
-; ===============================================================
+; -------------------------------------------------------------------------------------
+; Here is the special case for "-2147483648" string, This bugger is annoying, because it 
+; is its own complement and thus can't be negated, or created by negation, as my 
+; algorithm does with other vlaues. So we test the user's string against this special 
+; string, and short-circuit the logic to write it into the results.
+; -------------------------------------------------------------------------------------
 	CLD		
 	MOV		EDI, [EBP + 8]				; user string
 	MOV		ESI, [EBP + 20]				; bastard -2147483648 string
@@ -301,9 +312,12 @@ _scanForSpecial:
 	MOV		isValid, 1
 	JMP		_storeNum
 
-; ===============================================================
-; Here we test and set our personal sign flag
-; ===============================================================
+; -------------------------------------------------------------------------------------
+; Here we test and set our personal sign flag. THe sign flag will either be -1 if 
+; the user enters a - as the first character, 1 if the first character is a +, or 0 
+; if the user enters a digit. Also tests to see if the user is being clever and typing
+; a word, it rejects any ASII values that represent anything other than digits.
+; -------------------------------------------------------------------------------------
 _checkSign:
 	MOV		ESI, [EBP + 8]				; user string
 	MOV		EAX, 0
@@ -328,9 +342,12 @@ _setPlus:
 _setMinus:	
 	MOV		posOrNeg, -1				; set flag -1 and start parsing
 
-; ===============================================================
-; Here we count the length of the string
-; ===============================================================
+; -------------------------------------------------------------------------------------
+; Here we count the length of the string. We iterate over the string looking for the 
+; first ",0" terminator we see. If the string is 0 digits long (no entry), it gets
+; rejected. Strings over 11 digits get tossed too, because the max possible length is
+; "-2147483648" -- 11 characters.
+; -------------------------------------------------------------------------------------
 _countString:
 ;prep loop
 	MOV		ECX, 0						; start at 0
@@ -357,9 +374,13 @@ _doneCount:
 	CMP		stringLength, 11
 	JA		_exitProcedure
 
-; ===============================================================
-; Here is the loop to scan characters and add the values
-; ===============================================================
+; -------------------------------------------------------------------------------------
+; Here is the loop to scan characters and add the values. We start with the digit in 
+; the 1's place, convert it to a digit, and add it to localValue. Then we loop again
+; to the 10's place, multiply by the value, and add the value to localValue, 100s place,
+; 1000s pace, etc until the string is exhausted. Also filters out attempts with  
+; sneaky letters and non-digit characters in the string.
+; -------------------------------------------------------------------------------------
 	MOV		ECX, 0								; reset ECX
 	MOV		ESI, [EBP + 8]
 	ADD		ESI, stringLength					; Set ESI, add string length
@@ -425,8 +446,14 @@ _multiplierSet:
 
 	JMP		_mathLoop					; back to top
 
-; localvalue should have the sum of all the digits. Up until this point it was UNSIGNED, 
-; which means it could potentially hold numbers that are too large
+; -----------------------------------------------------------------------------------------
+; localvalue now holds the sum of all the digits. Up until this point it was UNSIGNED, 
+; which means it could potentially hold numbers that are too large to fit in a SIGNED INT.
+; So, we test it against the largest possible value, and reject ones that are too big. 
+; once rejection happens, we use the value in our sign flag to give it its desired sign.
+; If it's -1 we NEG the value, giving us the final SDWORD value. Then we store the value
+; in the appropriate variable, store the value of the "isValid" boolean, and kablammo!
+; -----------------------------------------------------------------------------------------
 _doneMath:
 	CMP		localValue, 2147483647		; compare with the max value we should allow  
 	JA		_exitProcedure				; larger? bye bye!
@@ -484,6 +511,13 @@ writeVal PROC
 	PUSH	EDX
 	PUSH	EDI
 
+; ----------------------------------------------------------------------------------------------
+; Here's the prepping we do before we calculate and create the string. We set up the initial
+; values of out local variables. We set our "negative number" status flag. IF we found the 
+; "speciaal number surprise", we increment by 1, and set a flag so we remember to decrement it
+; later. The last step is to store out value in the localVal variable, and we're ready to
+; go to town on this ********
+; ---------------------------------------------------------------------------------------------
 ; get offset value to last usable idex of array -- remember it's MAXCHARS + 1 long,
 ; but we reserve the last ,0 to terminate the output
 	MOV		EAX, MAXCHARS
@@ -504,7 +538,8 @@ writeVal PROC
 	INC		EAX							; bump it up to -2,147,483,647 for the next steps
 	MOV		specialFlag, 1
 
-; negate number nad set neg flag for later use
+; negate number nad set neg flag for later use. POSITIVE numbers give good results. Negative
+; ones give us the sadz when we do math.
 _notSpeeshul:
 	NEG		EAX							; negate
 	MOV		negFlag, 1					; set flag
@@ -513,6 +548,11 @@ _notSpeeshul:
 _notNegative:
 	MOV		localVal, EAX				; store the value
 
+;--------------------------------------------------------------------------------------------
+; Here we do the fun stuff, the math to generate the string body. Starting with the least 
+; significant digits place, we divide by 10, convert the remainder to ASCII, and write it 
+; into the array. Repeat until we're out of digits, and the string is built! (Backwards, natch.)
+; -------------------------------------------------------------------------------------------
 ; get address of array, and find target location
 	MOV		EDI, [EBP + 12]
 	ADD		EDI, arrayEnd				; increment to target location in array
@@ -550,7 +590,11 @@ _asciiAdd:
 
 	JMP		_startLoop					; restart loop
 
-; done dividing, do some output
+; -------------------------------------------------------------------------------------------
+; Time to print our string. if our negative flag has not been set, we just print it.
+; If our negative flag HAS been set, we write a negative sign charater at the beginning of
+; the string, and THEN print it.
+; -------------------------------------------------------------------------------------------
 _doneDiv:	 
 ; test to see if it's a negative number
 	CMP		negFlag, 1
