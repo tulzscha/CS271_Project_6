@@ -211,7 +211,9 @@ _doneFill:
 
 ; loop to display elements
 _displayLoop:
-	LODSD									; load the element to EAX
+	;LODSD									; load the element to EAX
+	MOV		EAX, [ESI]						; REGISTER INDIRECT, as per the project reqs
+	ADD		ESI, 4
 	ADD		sumValues, EAX					; add it to our sum
 
 ; display the current element
@@ -592,7 +594,7 @@ _asciiAdd:
 	STOSB
 
 ; if the quotient is 0, we've done enough math
-	CMP		localVal, 0					; if 0 is all that's left, we're done dividing
+	CMP		localVal, 0					; zerooooooooooo == done
 	JE		_doneDiv					; exit loop
 
 	JMP		_startLoop					; restart loop
