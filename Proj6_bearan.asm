@@ -1,7 +1,7 @@
 TITLE Project 6: String Primitives and Macros     (Proj6_bearan.asm)
 
 ; Author: Andrew Bear
-; Last Modified: 27Feb2022
+; Last Modified: 06Mar2022
 ; OSU email address: bearan@oregonstate.edu
 ; Course number/section:   CS271 Section 406
 ; Project Number: 6                Due Date: 13Mar2022
@@ -18,9 +18,10 @@ INCLUDE Irvine32.inc
 ; Outputs prompt, and calls Irvine ReadString to read response into memory
 ;
 ; Receives: prompt -- OFFSET of prompt to display
-;			targetLoc -- output location 
+;			targetLoc -- output location (offset)
 ;			maxLength -- Length of user input (required for Irvine ReadString)
-; Returns: screen output of string
+; Returns:	screen output of prompt string, user's string read into the location specified
+;			by targetLoc
 ;----------------------------------------------------------------------------------------------
 mGetString MACRO prompt, targetLoc, maxLength
 	PUSH	EAX
@@ -68,22 +69,26 @@ USERSTRLENGTH	=	16					; the user gets this much space to enter characters. More
 greeting	BYTE	"Project 6: String Primitives and Macros.",13,10
 			BYTE	"Programmed by A. Bear",13,10,13,10
 			BYTE	"**EC: Numbers the entry lines and displays a running total.",13,10
-			BYTE	"**EC: HAHAHAHAAH MAYBE IN ANOTHER LIFE.",13,10,13,10
+			BYTE	"**EC: NOT IMPLEMENTED. Sarcastic Remark Removed.",13,10,13,10
 			BYTE	"This program will ask you for 10 signed decimal integers.",13,10
 			BYTE	"Each integer must fit into a 32-bit register (-2,147,483,648 to 2,147,483,647).",13,10
 			BYTE	"Once you're done entering integers, the program will display a list",13,10
 			BYTE	"of the integers, the sum of the integers, and the average of the values.",13,10
 			BYTE	"Salmon on the bank / curing in the sun for days / eat them up yum yum ~A bear",13,10,13,10,0
+			
+; input prompts
 numEntry	BYTE	": Please enter a signed integer: ",0
 invalidNum	BYTE	32,32,32,"Something's wrong with your entry.",13,10,0
 tryAgain	BYTE	32,32,32,"Please try again: ",0
+
+; output prompts
 numsEntered	BYTE	13,10,"Here are your numbers, all in a nice row:",13,10,0
 numSum		BYTE	13,10,"The total sum of your numbers is: ",0
 numAverage	BYTE	13,10,"The truncated average of your numbers is: ",0
 byePrompt	BYTE	13,10,13,10,"Goodbye, and thanks for all the fish! ROAR!",13,10,0
-
 subTotMsg	BYTE	32,32,32,"Number Accepted! Your subtotal so far is: ",0
 
+; misc prompts
 oBracket	BYTE	"[",0
 cBracket	BYTE	"]",0
 comma		BYTE	", ",0
@@ -147,7 +152,7 @@ _fillArray:
 	JE		_validValue						; got it!
 
 _invalidValue:
-; we didn;t find the 1, sooooo ... invalid value found, ask again:
+; we didn't find the 1, sooooo ... invalid value found, ask again:
 	mDisplayString OFFSET invalidNum
 
 	; make readVal call to get user input -- stored in userVal if successful
@@ -262,7 +267,9 @@ main ENDP
 ; as appropriaate. WHen conclusion is reached, sets the validVal boolean as appropriate,
 ; and if a number was sucessfully entered, the number will be stored in the userVal variable.
 ;
-; Preconditions:	Prompt to print exists. "special dude" character string exists.
+; Preconditions:	Prompt to display exists. "special dude" character string exists. validVal
+;					exists for output. userVal exists for output. userString exists to hold
+;					user's string (held, not displayed).
 ; Postconditions: 
 ; Receives:			[EBP + 24] -- Offset of prompt to display
 ;					[EBP + 20] -- our special boah -2147483648 in string form
@@ -313,7 +320,7 @@ _scanForSpecial:
 	JMP		_storeNum
 
 ; -------------------------------------------------------------------------------------
-; Here we test and set our personal sign flag. THe sign flag will either be -1 if 
+; Here we test and set our personal sign flag. The sign flag will either be -1 if 
 ; the user enters a - as the first character, 1 if the first character is a +, or 0 
 ; if the user enters a digit. Also tests to see if the user is being clever and typing
 ; a word, it rejects any ASII values that represent anything other than digits.
@@ -378,7 +385,7 @@ _doneCount:
 ; Here is the loop to scan characters and add the values. We start with the digit in 
 ; the 1's place, convert it to a digit, and add it to localValue. Then we loop again
 ; to the 10's place, multiply by the value, and add the value to localValue, 100s place,
-; 1000s pace, etc until the string is exhausted. Also filters out attempts with  
+; 1000s place, etc until the string is exhausted. Also filters out attempts with  
 ; sneaky letters and non-digit characters in the string.
 ; -------------------------------------------------------------------------------------
 	MOV		ECX, 0								; reset ECX
@@ -585,7 +592,7 @@ _asciiAdd:
 	STOSB
 
 ; if the quotient is 0, we've done enough math
-	CMP		localVal, 0					; remainder 0, we're done dividing
+	CMP		localVal, 0					; if 0 is all that's left, we're done dividing
 	JE		_doneDiv					; exit loop
 
 	JMP		_startLoop					; restart loop

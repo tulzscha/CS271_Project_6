@@ -1,4 +1,4 @@
-Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
+Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/06/22 11:55:22
 <Project 6: String Primitives and Macros     (Proj6_bearan.a  Page 1 - 1
 
 
@@ -79,7 +79,7 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
 				ENDM
 
 				; (insert constant definitions here)
- = 0000000A			ARRAYLENGTH		=	10					; numer of ints to get - math is correct if tweaked!
+ = 00000005			ARRAYLENGTH		=	5					; numer of ints to get - math is correct if tweaked!
  = 0000000B			MAXCHARS		=	11					; a SDWORD int can only be 11 chars long, -2,147,483,648
  = 00000010			USERSTRLENGTH	=	16					; the user gets this much space to enter characters. More than they need.
 
@@ -272,35 +272,35 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  0000035F 0D 0A 00		linebreak	BYTE	13,10,0
 
 				; variables
- 00000362  0000000A [		numArray	SDWORD	ARRAYLENGTH DUP(?)			; array for holding the user's entered values
+ 00000362  00000005 [		numArray	SDWORD	ARRAYLENGTH DUP(?)			; array for holding the user's entered values
 	    00000000
 	   ]
 
 				; variables for readVal
- 0000038A 2D 32 31 34 37	specialNum	BYTE	"-2147483648",0,0,0,0,0,0   ; This damn number. Plus padding zeroes
+ 00000376 2D 32 31 34 37	specialNum	BYTE	"-2147483648",0,0,0,0,0,0   ; This damn number. Plus padding zeroes
 	   34 38 33 36 34
 	   38 00 00 00 00
 	   00 00
- 0000039B 00000001		validVal	SDWORD	1							; used as flag to check for valid readVal return
- 0000039F 00000000		userVal		SDWORD	0							; user's converted value will be here
- 000003A3  00000010 [		userString	BYTE	USERSTRLENGTH DUP(?)		; string to hold the string user enters.
+ 00000387 00000001		validVal	SDWORD	1							; used as flag to check for valid readVal return
+ 0000038B 00000000		userVal		SDWORD	0							; user's converted value will be here
+ 0000038F  00000010 [		userString	BYTE	USERSTRLENGTH DUP(?)		; string to hold the string user enters.
 	    00
 	   ]
- 000003B3  00000005 [		padding		BYTE	5 DUP(0)					; don't want overrun by some fluke
+ 0000039F  00000005 [		padding		BYTE	5 DUP(0)					; don't want overrun by some fluke
 	    00
 	   ]
 
 				; variables for writeVal
- 000003B8  0000000D [		tempArray	BYTE	(MAXCHARS + 2) DUP(0)		; array used as scratch by writeVal -- 12 characters, plus padding 0
+ 000003A4  0000000D [		tempArray	BYTE	(MAXCHARS + 2) DUP(0)		; array used as scratch by writeVal -- 12 characters, plus padding 0
 	    00
 	   ]
 
 				; EC variables
- 000003C5 00000000		runTotal	SDWORD	?							; running total sum
+ 000003B1 00000000		runTotal	SDWORD	?							; running total sum
 
 				; final calcs
- 000003C9 00000000		sumValues	SDWORD	?
- 000003CD 00000000		avgValues	SDWORD	?
+ 000003B5 00000000		sumValues	SDWORD	?
+ 000003B9 00000000		avgValues	SDWORD	?
 
 
  00000000			.code
@@ -312,9 +312,13 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  00000006  E8 00000000 E     1		CALL	WriteString
  0000000B  5A		     1		POP		EDX
 
-				; ===============================================================
-				; Here is the loop to fill the array
-				; ===============================================================
+				; -------------------------------------------------------------------------------------
+				; Here is the loop to fill the array.
+				; Loops ARRAYLENGTH times. 
+				; Each loop does this: Gets a value with readVal, makes sure it's valid. Re-prompts
+				; until valid number is received from the user. Then calculates and displays the
+				; running subtitle.
+				; -------------------------------------------------------------------------------------
  0000000C  BF 00000362 R		MOV		EDI, OFFSET numArray			; dest is start of array
  00000011  B9 00000001			MOV		ECX, 1
 
@@ -323,25 +327,25 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
 				; number the output line and display prompt
  00000016  8B C1			MOV		EAX, ECX						; current line
 
- 00000018  68 000003B8 R		PUSH	OFFSET tempArray				; scratch array for working in
+ 00000018  68 000003A4 R		PUSH	OFFSET tempArray				; scratch array for working in
  0000001D  50				PUSH	EAX								; push value to print out
  0000001E  E8 000002A1			CALL	writeVal						; actual CALL
 
 				; make readVal call to get user input -- stored in userVal if successful
  00000023  68 00000218 R		PUSH	OFFSET numEntry					; EBP+24 -- prompt to print for entry
- 00000028  68 0000038A R		PUSH	OFFSET specialNum				; EBP+20 -- the special case number I hate, string form
- 0000002D  68 0000039B R		PUSH	OFFSET validVal					; EBP+16 -- BOOLEAN FOR SUCCESS/FAILURE
- 00000032  68 0000039F R		PUSH	OFFSET userVal					; EBP+12 -- holds the SDWORD value of the user's string
- 00000037  68 000003A3 R		PUSH	OFFSET userString				; EBP+8	 -- Scratch, holds string user enters
+ 00000028  68 00000376 R		PUSH	OFFSET specialNum				; EBP+20 -- the special case number I hate, string form
+ 0000002D  68 00000387 R		PUSH	OFFSET validVal					; EBP+16 -- BOOLEAN FOR SUCCESS/FAILURE
+ 00000032  68 0000038B R		PUSH	OFFSET userVal					; EBP+12 -- holds the SDWORD value of the user's string
+ 00000037  68 0000038F R		PUSH	OFFSET userString				; EBP+8	 -- Scratch, holds string user enters
  0000003C  E8 0000012C			CALL	readVal
 
 				; check result boolean for valid value
- 00000041  83 3D 0000039B R		CMP		validVal, 1
+ 00000041  83 3D 00000387 R		CMP		validVal, 1
 	   01
  00000048  74 33			JE		_validValue						; got it!
 
  0000004A			_invalidValue:
-				; invalid value found, ask again:
+				; we didn;t find the 1, sooooo ... invalid value found, ask again:
 					mDisplayString OFFSET invalidNum
  0000004A  52		     1		PUSH	EDX							; uses EDX so we protect it
  0000004B  BA 0000023A R     1		MOV		EDX, OFFSET invalidNum			; standard writeString call
@@ -350,28 +354,29 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
 
 					; make readVal call to get user input -- stored in userVal if successful
  00000056  68 00000262 R		PUSH	OFFSET tryAgain					; EBP+24 -- prompt to print for entry
- 0000005B  68 0000038A R		PUSH	OFFSET specialNum				; EBP+20 -- the special case number I hate, string form
- 00000060  68 0000039B R		PUSH	OFFSET validVal					; EBP+16 -- BOOLEAN FOR SUCCESS/FAILURE
- 00000065  68 0000039F R		PUSH	OFFSET userVal					; EBP+12 -- holds the SDWORD value of the user's string
- 0000006A  68 000003A3 R		PUSH	OFFSET userString				; EBP+8	 -- Scratch, holds string user enters
+ 0000005B  68 00000376 R		PUSH	OFFSET specialNum				; EBP+20 -- the special case number I hate, string form
+ 00000060  68 00000387 R		PUSH	OFFSET validVal					; EBP+16 -- BOOLEAN FOR SUCCESS/FAILURE
+ 00000065  68 0000038B R		PUSH	OFFSET userVal					; EBP+12 -- holds the SDWORD value of the user's string
+ 0000006A  68 0000038F R		PUSH	OFFSET userString				; EBP+8	 -- Scratch, holds string user enters
  0000006F  E8 000000F9			CALL	readVal
 
- 00000074  83 3D 0000039B R		CMP		validVal, 0
+				; we want to repeat the INVALID prompt, not the normal prompt
+ 00000074  83 3D 00000387 R		CMP		validVal, 0						
 	   00
  0000007B  74 CD			JE		_invalidValue
 
 				; we just got a valid value, so we jump here:
  0000007D			_validValue:
- 0000007D  A1 0000039F R		MOV		EAX, userVal					; get the result
+ 0000007D  A1 0000038B R		MOV		EAX, userVal					; get the result
 					
  00000082  89 07			MOV		[EDI], EAX						; store it in array
 
- 00000084  01 05 000003C5 R		ADD		runTotal, EAX					; add it to the running total
+ 00000084  01 05 000003B1 R		ADD		runTotal, EAX					; add it to the running total
 					
  0000008A  41				INC		ECX								; next loop value
  0000008B  83 C7 04			ADD		EDI, TYPE numArray				; move EDI to next array location
 
- 0000008E  83 F9 0A			CMP		ECX, ARRAYLENGTH				; have we gotten enough numbers?
+ 0000008E  83 F9 05			CMP		ECX, ARRAYLENGTH				; have we gotten enough numbers?
  00000091  7F 39			JG		_doneFill
 
 				; Display running subtotal
@@ -380,9 +385,9 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  00000094  BA 0000032A R     1		MOV		EDX, OFFSET subTotMsg			; standard writeString call
  00000099  E8 00000000 E     1		CALL	WriteString
  0000009E  5A		     1		POP		EDX
- 0000009F  A1 000003C5 R		MOV		EAX, runTotal
+ 0000009F  A1 000003B1 R		MOV		EAX, runTotal
 
- 000000A4  68 000003B8 R		PUSH	OFFSET tempArray				; scratch array for working in
+ 000000A4  68 000003A4 R		PUSH	OFFSET tempArray				; scratch array for working in
  000000A9  50				PUSH	EAX								; push value to print out
  000000AA  E8 00000215			CALL	writeVal						; actual CALL
 
@@ -399,9 +404,13 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
 
  000000C7  E9 FFFFFF4A			JMP		_fillArray
 
-				; =========================================================================================
-				; Done filling the array, so here we display the resulting array, and the total and average
-				; =========================================================================================
+				; ------------------------------------------------------------------------------------------
+				; Done filling the array, so here we display the resulting array, and the total and average.
+				; Displays a prompt, and then an opening bracket. Cycles through array printing values
+				; separated by commas, until array is exhausted, then closes the brackets.  Displays the sum
+				; of the numbers, and then calculates and displays the truncated integer average. Then...
+				; the proram ends! Hopefully with less smoke and fire than some code I've written.
+				; ------------------------------------------------------------------------------------------
  000000CC			_doneFill:
 					mDisplayString	OFFSET numsEntered		; array display prompt
  000000CC  52		     1		PUSH	EDX							; uses EDX so we protect it
@@ -416,15 +425,15 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  000000E3  5A		     1		POP		EDX
 
  000000E4  BE 00000362 R		MOV		ESI, OFFSET numArray			; offset of first element
- 000000E9  B9 0000000A			MOV		ECX, ARRAYLENGTH				; count of loops to run
+ 000000E9  B9 00000005			MOV		ECX, ARRAYLENGTH				; count of loops to run
 
 				; loop to display elements
  000000EE			_displayLoop:
- 000000EE  AD				LODSD									; load the element to EAX
- 000000EF  01 05 000003C9 R		ADD		sumValues, EAX					; add it to our sum
+ 000000EE  AD	LODSD									; load the element to EAX
+ 000000EF  01 05 000003B5 R		ADD		sumValues, EAX					; add it to our sum
 
 				; display the current element
- 000000F5  68 000003B8 R		PUSH	OFFSET tempArray				; scratch array for working in
+ 000000F5  68 000003A4 R		PUSH	OFFSET tempArray				; scratch array for working in
  000000FA  50				PUSH	EAX								; push value to print out
  000000FB  E8 000001C4			CALL	writeVal						; actual CALL
 
@@ -455,9 +464,9 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  00000125  E8 00000000 E     1		CALL	WriteString
  0000012A  5A		     1		POP		EDX
 
- 0000012B  A1 000003C9 R		MOV		EAX,	sumValues				; sum to EAX
+ 0000012B  A1 000003B5 R		MOV		EAX,	sumValues				; sum to EAX
 
- 00000130  68 000003B8 R		PUSH	OFFSET tempArray				; print sum of values
+ 00000130  68 000003A4 R		PUSH	OFFSET tempArray				; print sum of values
  00000135  50				PUSH	EAX
  00000136  E8 00000189			CALL	writeVal
 
@@ -469,13 +478,14 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  00000146  5A		     1		POP		EDX
 
  00000147  99				CDQ										; div by ARRAYLENGTH to find average
- 00000148  BB 0000000A			MOV		EBX,	ARRAYLENGTH
+ 00000148  BB 00000005			MOV		EBX,	ARRAYLENGTH
  0000014D  F7 FB			IDIV	EBX
 
- 0000014F  68 000003B8 R		PUSH	OFFSET tempArray				; scratch array for working in
+ 0000014F  68 000003A4 R		PUSH	OFFSET tempArray				; scratch array for working in
  00000154  50				PUSH	EAX								; we don't care about fractions, just print quotient
  00000155  E8 0000016A			CALL	writeVal						; actual CALL
-					
+
+				; so long, and thanks for all the bits
 					mDisplayString	OFFSET byePrompt
  0000015A  52		     1		PUSH	EDX							; uses EDX so we protect it
  0000015B  BA 000002F8 R     1		MOV		EDX, OFFSET byePrompt			; standard writeString call
@@ -505,7 +515,9 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
 				;					[EBP + 12] -- userVal variable; will be filled with SDWORD conversion
 				;								  (iff successful!)
 				;					[EBP + 8] -- userString; OFFSET of array to store the user's string 
-				; Returns:			
+				; Returns:			userString holds the string the user entered. Not used, but it's there.
+				;					Value of user's string entry converted to SDWORD and stored in userVal.
+				;					validVal holds 0 (invalid) or 1 (valid) depending the user's entry
 				;----------------------------------------------------------------------------------------------
  0000016D			readVal PROC
 				; declare LOCAL variables, for my sanity instead of needing offsets for EVERYTHING.
@@ -543,9 +555,12 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  000001AC  59		     1		POP		ECX
  000001AD  58		     1		POP		EAX
 					
-				; ===============================================================
-				; Here is the special case for -2147483648 string
-				; ===============================================================
+				; -------------------------------------------------------------------------------------
+				; Here is the special case for "-2147483648" string, This bugger is annoying, because it 
+				; is its own complement and thus can't be negated, or created by negation, as my 
+				; algorithm does with other vlaues. So we test the user's string against this special 
+				; string, and short-circuit the logic to write it into the results.
+				; -------------------------------------------------------------------------------------
  000001AE  FC				CLD		
  000001AF  8B 7D 08			MOV		EDI, [EBP + 8]				; user string
  000001B2  8B 75 14			MOV		ESI, [EBP + 20]				; bastard -2147483648 string
@@ -563,9 +578,12 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
 	   00000001
  000001CD  E9 000000DD			JMP		_storeNum
 
-				; ===============================================================
-				; Here we test and set our personal sign flag
-				; ===============================================================
+				; -------------------------------------------------------------------------------------
+				; Here we test and set our personal sign flag. THe sign flag will either be -1 if 
+				; the user enters a - as the first character, 1 if the first character is a +, or 0 
+				; if the user enters a digit. Also tests to see if the user is being clever and typing
+				; a word, it rejects any ASII values that represent anything other than digits.
+				; -------------------------------------------------------------------------------------
  000001D2			_checkSign:
  000001D2  8B 75 08			MOV		ESI, [EBP + 8]				; user string
  000001D5  B8 00000000			MOV		EAX, 0
@@ -592,10 +610,12 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  00000202  C7 45 F4			MOV		posOrNeg, -1				; set flag -1 and start parsing
 	   FFFFFFFF
 
-
-				; ===============================================================
-				; Here we count the length of the string
-				; ===============================================================
+				; -------------------------------------------------------------------------------------
+				; Here we count the length of the string. We iterate over the string looking for the 
+				; first ",0" terminator we see. If the string is 0 digits long (no entry), it gets
+				; rejected. Strings over 11 digits get tossed too, because the max possible length is
+				; "-2147483648" -- 11 characters.
+				; -------------------------------------------------------------------------------------
  00000209			_countString:
 				;prep loop
  00000209  B9 00000000			MOV		ECX, 0						; start at 0
@@ -622,9 +642,13 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  0000022B  83 7D F0 0B			CMP		stringLength, 11
  0000022F  0F 87 00000082		JA		_exitProcedure
 
-				; ===============================================================
-				; Here is the loop to scan characters and add the values
-				; ===============================================================
+				; -------------------------------------------------------------------------------------
+				; Here is the loop to scan characters and add the values. We start with the digit in 
+				; the 1's place, convert it to a digit, and add it to localValue. Then we loop again
+				; to the 10's place, multiply by the value, and add the value to localValue, 100s place,
+				; 1000s pace, etc until the string is exhausted. Also filters out attempts with  
+				; sneaky letters and non-digit characters in the string.
+				; -------------------------------------------------------------------------------------
  00000235  B9 00000000			MOV		ECX, 0								; reset ECX
  0000023A  8B 75 08			MOV		ESI, [EBP + 8]
  0000023D  03 75 F0			ADD		ESI, stringLength					; Set ESI, add string length
@@ -690,8 +714,14 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
 
  0000028D  EB BC			JMP		_mathLoop					; back to top
 
-				; localvalue should have the sum of all the digits. Up until this point it was UNSIGNED, 
-				; which means it could potentially hold numbers that are too large
+				; -----------------------------------------------------------------------------------------
+				; localvalue now holds the sum of all the digits. Up until this point it was UNSIGNED, 
+				; which means it could potentially hold numbers that are too large to fit in a SIGNED INT.
+				; So, we test it against the largest possible value, and reject ones that are too big. 
+				; once rejection happens, we use the value in our sign flag to give it its desired sign.
+				; If it's -1 we NEG the value, giving us the final SDWORD value. Then we store the value
+				; in the appropriate variable, store the value of the "isValid" boolean, and kablammo!
+				; -----------------------------------------------------------------------------------------
  0000028F			_doneMath:
  0000028F  81 7D F8			CMP		localValue, 2147483647		; compare with the max value we should allow  
 	   7FFFFFFF
@@ -701,6 +731,7 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  00000298  C7 45 FC			MOV		isValid, 1
 	   00000001
 
+				; test our sign flag
  0000029F  83 7D F4 FF			CMP		posOrNeg, -1
  000002A3  75 0A			JNE		_storeNum					; not neg, can just store
 
@@ -755,6 +786,13 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  000002CC  52				PUSH	EDX
  000002CD  57				PUSH	EDI
 
+				; ----------------------------------------------------------------------------------------------
+				; Here's the prepping we do before we calculate and create the string. We set up the initial
+				; values of out local variables. We set our "negative number" status flag. IF we found the 
+				; "speciaal number surprise", we increment by 1, and set a flag so we remember to decrement it
+				; later. The last step is to store out value in the localVal variable, and we're ready to
+				; go to town on this ********
+				; ---------------------------------------------------------------------------------------------
 				; get offset value to last usable idex of array -- remember it's MAXCHARS + 1 long,
 				; but we reserve the last ,0 to terminate the output
  000002CE  B8 0000000B			MOV		EAX, MAXCHARS
@@ -778,7 +816,8 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  000002F4  C7 45 F0			MOV		specialFlag, 1
 	   00000001
 
-				; negate number nad set neg flag for later use
+				; negate number nad set neg flag for later use. POSITIVE numbers give good results. Negative
+				; ones give us the sadz when we do math.
  000002FB			_notSpeeshul:
  000002FB  F7 D8			NEG		EAX							; negate
  000002FD  C7 45 F4			MOV		negFlag, 1					; set flag
@@ -788,6 +827,11 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
  00000304			_notNegative:
  00000304  89 45 FC			MOV		localVal, EAX				; store the value
 
+				;--------------------------------------------------------------------------------------------
+				; Here we do the fun stuff, the math to generate the string body. Starting with the least 
+				; significant digits place, we divide by 10, convert the remainder to ASCII, and write it 
+				; into the array. Repeat until we're out of digits, and the string is built! (Backwards, natch.)
+				; -------------------------------------------------------------------------------------------
 				; get address of array, and find target location
  00000307  8B 7D 0C			MOV		EDI, [EBP + 12]
  0000030A  03 7D F8			ADD		EDI, arrayEnd				; increment to target location in array
@@ -826,7 +870,11 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
 
  00000336  EB D6			JMP		_startLoop					; restart loop
 
-				; done dividing, do some output
+				; -------------------------------------------------------------------------------------------
+				; Time to print our string. if our negative flag has not been set, we just print it.
+				; If our negative flag HAS been set, we write a negative sign charater at the beginning of
+				; the string, and THEN print it.
+				; -------------------------------------------------------------------------------------------
  00000338			_doneDiv:	 
 				; test to see if it's a negative number
  00000338  83 7D F4 01			CMP		negFlag, 1
@@ -858,7 +906,7 @@ Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
 
 
 				END main
-Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/02/22 22:47:11
+Microsoft (R) Macro Assembler Version 14.29.30138.0	    03/06/22 11:55:22
 <Project 6: String Primitives and Macros     (Proj6_bearan.a  Symbols 2 - 1
 
 
@@ -960,7 +1008,7 @@ Segments and Groups:
 
 FLAT . . . . . . . . . . . . . .	GROUP
 STACK  . . . . . . . . . . . . .	32 Bit	 00001000 Para	  Stack	  'STACK'	 
-_DATA  . . . . . . . . . . . . .	32 Bit	 000003D1 Para	  Public  'DATA'	
+_DATA  . . . . . . . . . . . . .	32 Bit	 000003BD Para	  Public  'DATA'	
 _TEXT  . . . . . . . . . . . . .	32 Bit	 0000035A Para	  Public  'CODE'	
 
 
@@ -1125,7 +1173,7 @@ Symbols:
 @fardata . . . . . . . . . . . .	Text   	 FLAT
 @stack . . . . . . . . . . . . .	Text   	 FLAT
 ALT_MASK . . . . . . . . . . . .	Number	 00000003h   
-ARRAYLENGTH  . . . . . . . . . .	Number	 0000000Ah   
+ARRAYLENGTH  . . . . . . . . . .	Number	 00000005h   
 CAPSLOCK_ON  . . . . . . . . . .	Number	 00000080h   
 CREATE_ALWAYS  . . . . . . . . .	Number	 00000002h   
 CREATE_NEW . . . . . . . . . . .	Number	 00000001h   
@@ -1327,7 +1375,7 @@ VK_UP  . . . . . . . . . . . . .	Number	 00000026h
 WINDOW_BUFFER_SIZE_EVENT . . . .	Number	 00000004h   
 WriteConsoleOutputCharacter  . .	Text   	 WriteConsoleOutputCharacterA
 WriteConsole . . . . . . . . . .	Text   	 WriteConsoleA
-avgValues  . . . . . . . . . . .	DWord	 000003CD _DATA	
+avgValues  . . . . . . . . . . .	DWord	 000003B9 _DATA	
 black  . . . . . . . . . . . . .	Number	 00000000h   
 blue . . . . . . . . . . . . . .	Number	 00000001h   
 brown  . . . . . . . . . . . . .	Number	 00000006h   
@@ -1354,17 +1402,17 @@ numEntry . . . . . . . . . . . .	Byte	 00000218 _DATA
 numSum . . . . . . . . . . . . .	Byte	 000002A6 _DATA	
 numsEntered  . . . . . . . . . .	Byte	 00000278 _DATA	
 oBracket . . . . . . . . . . . .	Byte	 00000358 _DATA	
-padding  . . . . . . . . . . . .	Byte	 000003B3 _DATA	
+padding  . . . . . . . . . . . .	Byte	 0000039F _DATA	
 red  . . . . . . . . . . . . . .	Number	 00000004h   
-runTotal . . . . . . . . . . . .	DWord	 000003C5 _DATA	
-specialNum . . . . . . . . . . .	Byte	 0000038A _DATA	
+runTotal . . . . . . . . . . . .	DWord	 000003B1 _DATA	
+specialNum . . . . . . . . . . .	Byte	 00000376 _DATA	
 subTotMsg  . . . . . . . . . . .	Byte	 0000032A _DATA	
-sumValues  . . . . . . . . . . .	DWord	 000003C9 _DATA	
-tempArray  . . . . . . . . . . .	Byte	 000003B8 _DATA	
+sumValues  . . . . . . . . . . .	DWord	 000003B5 _DATA	
+tempArray  . . . . . . . . . . .	Byte	 000003A4 _DATA	
 tryAgain . . . . . . . . . . . .	Byte	 00000262 _DATA	
-userString . . . . . . . . . . .	Byte	 000003A3 _DATA	
-userVal  . . . . . . . . . . . .	DWord	 0000039F _DATA	
-validVal . . . . . . . . . . . .	DWord	 0000039B _DATA	
+userString . . . . . . . . . . .	Byte	 0000038F _DATA	
+userVal  . . . . . . . . . . . .	DWord	 0000038B _DATA	
+validVal . . . . . . . . . . . .	DWord	 00000387 _DATA	
 white  . . . . . . . . . . . . .	Number	 0000000Fh   
 wsprintf . . . . . . . . . . . .	Text   	 wsprintfA
 yellow . . . . . . . . . . . . .	Number	 0000000Eh   
